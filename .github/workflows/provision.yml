@@ -29,7 +29,22 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Generate and Store DB Password in Key Vault (if not exists)
+      - name: Create Key Vault 
+        run: |
+          az keyvault show --name $KV_NAME --resource-group $RG || \
+          az keyvault create --name $KV_NAME --resource-group $RG --location $LOCATION --enable-rbac-authorization true
+
+      - name: Grant Key Vault Access to SP via RBAC
+        run: |
+          SP_CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientId)
+          for ROLE in "Key Vault Secrets Officer" "Key Vault Certificates Officer" "Key Vault Crypto Officer"; do
+            az role assignment create \
+              --assignee $SP_CLIENT_ID \
+              --role "$ROLE" \
+              --scope "/subscriptions/6a324482-7a11-4ff0-8540-48ccd816e396/resourceGroups/$RG/providers/Microsoft.KeyVault/vaults/$KV_NAME"
+          done
+
+      - name: Generate and Store DB Password in Key Vault
         run: |
           if ! az keyvault secret show --vault-name $KV_NAME --name "PG-ADMIN-PASSWORD" &> /dev/null; then
             PASSWORD=$(openssl rand -base64 24)
@@ -38,53 +53,60 @@ jobs:
 
       - name: Get DB Password from Key Vault
         id: get_db_password
-        run: echo "PG_PASSWORD=$(az keyvault secret show --vault-name $KV_NAME --name PG-ADMIN-PASSWORD --query value -o tsv)" >> $GITHUB_ENV
+        run: |
+          echo "PG_PASSWORD=$(az keyvault secret show --vault-name $KV_NAME --name PG-ADMIN-PASSWORD --query value -o tsv)" >> $GITHUB_ENV
 
       - name: Create PostgreSQL DB
         run: |
-          az postgres flexible-server create \
-            --resource-group $RG \
-            --name $PG_NAME \
-            --admin-user medusauser \
-            --admin-password $PG_PASSWORD \
-            --location $LOCATION \
-            --public-access 0.0.0.0
-
-      - name: Store PG Connection String in Key Vault
-        run: |
-          PG_CONN_STR="postgres://medusauser:$PG_PASSWORD@${{ env.PG_NAME }}.postgres.database.azure.com:5432/medusadb"
-          az keyvault secret set --vault-name $KV_NAME --name "PG-CONN-STRING" --value "$PG_CONN_STR"
+          if ! az postgres flexible-server show --resource-group $RG --name $PG_NAME &> /dev/null; then
+            az postgres flexible-server create \
+              --resource-group $RG \
+              --name $PG_NAME \
+              --admin-user medusauser \
+              --admin-password $PG_PASSWORD \
+              --location $LOCATION \
+              --public-access 0.0.0.0
+            PG_CONN_STR="postgres://medusauser:$PG_PASSWORD@$PG_NAME.postgres.database.azure.com:5432/medusadb"
+            az keyvault secret set --vault-name $KV_NAME --name "PG-CONN-STRING" --value "$PG_CONN_STR"
+          fi
 
       - name: Create Redis
         run: |
-          az redis create \
-            --name $REDIS_NAME \
-            --resource-group $RG \
-            --location $LOCATION \
-            --sku Basic \
-            --vm-size C0
-          REDIS_HOST=$(az redis show --name $REDIS_NAME --resource-group $RG --query hostName -o tsv)
-          REDIS_CONN="redis://$REDIS_HOST:6379"
-          az keyvault secret set --vault-name $KV_NAME --name "REDIS-CONN-STRING" --value "$REDIS_CONN"
+          if ! az redis show --name $REDIS_NAME --resource-group $RG &> /dev/null; then
+            az redis create \
+              --name $REDIS_NAME \
+              --resource-group $RG \
+              --location $LOCATION \
+              --sku Basic \
+              --vm-size C0
+            REDIS_HOST=$(az redis show --name $REDIS_NAME --resource-group $RG --query hostName -o tsv)
+            REDIS_CONN="redis://$REDIS_HOST:6379"
+            az keyvault secret set --vault-name $KV_NAME --name "REDIS-CONN-STRING" --value "$REDIS_CONN"
+          fi
 
       - name: Create Blob Storage
         run: |
-          az storage account create \
-            --name $STORAGE_NAME \
-            --resource-group $RG \
-            --location $LOCATION \
-            --sku Standard_LRS
-          STORAGE_KEY=$(az storage account keys list --account-name $STORAGE_NAME --resource-group $RG --query '[0].value' -o tsv)
-          az keyvault secret set --vault-name $KV_NAME --name "STORAGE-ACCOUNT-KEY" --value "$STORAGE_KEY"
+          if ! az storage account show --name $STORAGE_NAME --resource-group $RG &> /dev/null; then
+            az storage account create \
+              --name $STORAGE_NAME \
+              --resource-group $RG \
+              --location $LOCATION \
+              --sku Standard_LRS
+            STORAGE_KEY=$(az storage account keys list --account-name $STORAGE_NAME --resource-group $RG --query '[0].value' -o tsv)
+            az keyvault secret set --vault-name $KV_NAME --name "STORAGE-ACCOUNT-KEY" --value "$STORAGE_KEY"
+          fi
 
-      - name: Create Container Registry (ACR)
+      - name: Create Container Registry
         run: |
-          az acr create \
-            --resource-group $RG \
-            --name $ACR_NAME \
-            --sku Basic \
-            --location $LOCATION
-          ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query username -o tsv)
-          ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query passwords[0].value -o tsv)
-          az keyvault secret set --vault-name $KV_NAME --name "ACR-USERNAME" --value "$ACR_USERNAME"
-          az keyvault secret set --vault-name $KV_NAME --name "ACR-PASSWORD" --value "$ACR_PASSWORD"
+          if ! az acr show --name $ACR_NAME --resource-group $RG &> /dev/null; then
+            az acr create \
+              --resource-group $RG \
+              --name $ACR_NAME \
+              --sku Basic \
+              --location $LOCATION
+            az acr update -n $ACR_NAME --admin-enabled true
+            ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query username -o tsv)
+            ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query passwords[0].value -o tsv)
+            az keyvault secret set --vault-name $KV_NAME --name "ACR-USERNAME" --value "$ACR_USERNAME"
+            az keyvault secret set --vault-name $KV_NAME --name "ACR-PASSWORD" --value "$ACR_PASSWORD"
+          fi
