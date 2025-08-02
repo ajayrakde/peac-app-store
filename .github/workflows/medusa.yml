@@ -1,4 +1,4 @@
-name: 🧹 Deploy Medusa to Azure Container Apps
+name: Deploy Medusa to Azure Container Apps
 
 on:
   workflow_dispatch: {}
@@ -69,31 +69,31 @@ jobs:
           containerAppEnvironment: ${{ env.ENVIRONMENT_NAME }}
           registryServer: ${{ env.REGISTRY_SERVER }}
           imageToDeploy: ${{ env.IMAGE_URI }}
-        yamlConfig: |
-          containers:
-            - name: medusa
-              image: ${{ env.IMAGE_URI }}
-              cpu: 1
-              memory: 2Gi
-          environmentVariables:
-            - name: MEDUSA_WORKER_MODE
-              value: "server"
-            - name: DISABLE_MEDUSA_ADMIN
-              value: "false"
-            - name: DATABASE_URL
-              secretRef: PG-CONN-STRING
-            - name: REDIS_URL
-              secretRef: REDIS-CONN-STRING
-            - name: COOKIE_SECRET
-              secretRef: COOKIE-SECRET
-            - name: JWT_SECRET
-              secretRef: JWT-SECRET
-            - name: STORE_CORS
-              value: ${{ env.STORE_CORS }}
-            - name: ADMIN_CORS
-              value: ${{ env.ADMIN_CORS }}
-            - name: AUTH_CORS
-              value: ${{ env.AUTH_CORS }}
+          yamlConfig: |
+            containers:
+              - name: medusa
+                image: ${{ env.IMAGE_URI }}
+                cpu: 1
+                memory: 2Gi
+            environmentVariables:
+              - name: MEDUSA_WORKER_MODE
+                value: "server"
+              - name: DISABLE_MEDUSA_ADMIN
+                value: "false"
+              - name: DATABASE_URL
+                secretRef: PG-CONN-STRING
+              - name: REDIS_URL
+                secretRef: REDIS-CONN-STRING
+              - name: COOKIE_SECRET
+                secretRef: COOKIE-SECRET
+              - name: JWT_SECRET
+                secretRef: JWT-SECRET
+              - name: STORE_CORS
+                value: ${{ env.STORE_CORS }}
+              - name: ADMIN_CORS
+                value: ${{ env.ADMIN_CORS }}
+              - name: AUTH_CORS
+                value: ${{ env.AUTH_CORS }}
 
       - name: Deploy medusa-worker
         uses: azure/container-apps-deploy-action@v1
@@ -104,28 +104,28 @@ jobs:
           containerAppEnvironment: ${{ env.ENVIRONMENT_NAME }}
           registryServer: ${{ env.REGISTRY_SERVER }}
           imageToDeploy: ${{ env.IMAGE_URI }}
-        yamlConfig: |
-          containers:
-            - name: medusa
-              image: ${{ env.IMAGE_URI }}
-              cpu: 1
-              memory: 2Gi
-          environmentVariables:
-            - name: MEDUSA_WORKER_MODE
-              value: "worker"
-            - name: DISABLE_MEDUSA_ADMIN
-              value: "true"
-            - name: DATABASE_URL
-              secretRef: PG-CONN-STRING
-            - name: REDIS_URL
-              secretRef: REDIS-CONN-STRING
-            - name: COOKIE_SECRET
-              secretRef: COOKIE-SECRET
-            - name: JWT_SECRET
-              secretRef: JWT-SECRET
-            - name: STORE_CORS
-              value: ${{ env.STORE_CORS }}
-            - name: ADMIN_CORS
-              value: ${{ env.ADMIN_CORS }}
-            - name: AUTH_CORS
-              value: ${{ env.AUTH_CORS }}
+          yamlConfig: |
+            containers:
+              - name: medusa
+                image: ${{ env.IMAGE_URI }}
+                cpu: 1
+                memory: 2Gi
+            environmentVariables:
+              - name: MEDUSA_WORKER_MODE
+                value: "worker"
+              - name: DISABLE_MEDUSA_ADMIN
+                value: "true"
+              - name: DATABASE_URL
+                secretRef: PG-CONN-STRING
+              - name: REDIS_URL
+                secretRef: REDIS-CONN-STRING
+              - name: COOKIE_SECRET
+                secretRef: COOKIE-SECRET
+              - name: JWT_SECRET
+                secretRef: JWT-SECRET
+              - name: STORE_CORS
+                value: ${{ env.STORE_CORS }}
+              - name: ADMIN_CORS
+                value: ${{ env.ADMIN_CORS }}
+              - name: AUTH_CORS
+                value: ${{ env.AUTH_CORS }}
