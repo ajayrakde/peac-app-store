@@ -17,7 +17,7 @@ jobs:
       PG_NAME: pg-kanhaa-app-store
       REDIS_NAME: redis-kanhaa-app-store
       STORAGE_NAME: stkanhaaappstore
-      ACR_NAME: acr-kanhaa-app-store
+      ACR_NAME: acrkanhaaappstore
       KV_NAME: kv-kanhaa-app-store
 
     steps:
