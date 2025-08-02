@@ -36,7 +36,8 @@ jobs:
 
       - name: Grant Key Vault Access to SP via RBAC
         run: |
-          SP_CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientId)
+          SP_CLIENT_ID=$(echo "${{ secrets.AZURE_CREDENTIALS }}" | jq -r .clientId)
+          echo "SP_CLIENT_ID is: $SP_CLIENT_ID"
           for ROLE in "Key Vault Secrets Officer" "Key Vault Certificates Officer" "Key Vault Crypto Officer"; do
             az role assignment create \
               --assignee $SP_CLIENT_ID \
