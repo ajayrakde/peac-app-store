@@ -1,10 +1,8 @@
 name: Build and Push Medusa Image to ACR
 
 on:
-  push:
-    branches:
-      - main
-
+  workflow_dispatch: {}
+  
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
