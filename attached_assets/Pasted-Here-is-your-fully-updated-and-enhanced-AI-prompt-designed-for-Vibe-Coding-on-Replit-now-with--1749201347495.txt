@@ -1,0 +1,215 @@
+Here is your **fully updated and enhanced AI prompt** designed for Vibe Coding on Replit — now with Firebase and including a powerful **admin-only Candidate-Job Matching Engine**.
+
+---
+
+## 🔧 FINAL VIBE CODING PROMPT – Fullstack Web App (Replit + Firebase + Matching Engine)
+
+---
+
+### 🎯 OBJECTIVE
+
+Develop a **complete web application** for onboarding **employers and candidates**, featuring:
+
+* Firebase Authentication (Phone/Email)
+* Firebase Firestore (Database)
+* Firebase Storage (Document Uploads)
+* Admin Dashboard with AI-powered Matching Engine
+* Role-based routing, secure file uploads, and data export
+
+The app must be **fully compatible with Replit** and runnable with minimal setup.
+
+---
+
+### 🧰 STACK SPECIFICATIONS
+
+| Layer        | Tech Stack                                                   |
+| ------------ | ------------------------------------------------------------ |
+| Frontend     | React + Vite + Tailwind CSS                                  |
+| Backend      | Node.js + Express                                            |
+| Auth         | Firebase Auth (Phone OTP & Email)                            |
+| Database     | Firebase Firestore                                           |
+| File Storage | Firebase Storage                                             |
+| Hosting      | Replit Web Server                                            |
+| AI Matching  | In-memory JS or TF.js model or rule-based similarity scoring |
+| Export       | `exceljs`, `jspdf`                                           |
+
+---
+
+### 👥 USER ROLES & ROUTES
+
+| Role      | Access Routes                                                          |
+| --------- | ---------------------------------------------------------------------- |
+| Candidate | `/register/candidate`, `/dashboard/candidate`, `/jobs`, `/profile`     |
+| Employer  | `/register/employer`, `/dashboard/employer`, `/job-posts`, `/profile`  |
+| Admin     | `/admin/login`, `/admin/dashboard`, `/admin/jobs`, `/admin/candidates` |
+
+Use Firebase Auth + Firestore role fields. Route guards based on role.
+
+---
+
+### 🔐 AUTH FLOW
+
+* Enable Phone & Email login in Firebase
+* On login, get Firebase ID token and pass to backend
+* Backend uses Firebase Admin SDK to verify token and decode role
+
+---
+
+### 🧾 EMPLOYER FORM (Job Posting)
+
+* Org Name, Registration No, Business Type
+* Address + Contact Details
+* Uploads: Shop Act, Reg. Cert
+* Job Post Form (multi-entry):
+
+  * Job Code, Min Qualification, Skills, Expected Salary
+
+---
+
+### 🧾 CANDIDATE FORM
+
+* Name, DOB, Gender, Marital, Dependents
+* Contact + Emergency
+* Qualifications, Experience (multi-entry)
+* Uploads: Aadhaar, PAN, Certificates
+* Languages + Expected Salary + Job Code(s) applying for
+
+---
+
+## 📊 🧠 ADMIN-ONLY MATCHING ENGINE (NEW FUNCTIONALITY)
+
+### 🔥 FEATURE: Candidate-Job Compatibility Scoring
+
+**Matching Engine (rule-based or AI-based):**
+
+* Compare Job Requirements (Skills, Qualification, Salary) with Candidate Profile
+* Assign score out of 100
+* Use basic NLP similarity or manual rules (skills overlap, salary match, qualification match)
+
+---
+
+### ✅ ADMIN CAN:
+
+1. **View All Open Jobs**
+
+   * Navigate to `/admin/jobs`
+   * Click on a job → open `/admin/jobs/:jobId`
+   * Click **“Find Matching Candidates”**
+   * Show **Top 10% compatible candidates** with:
+
+     * Name, Match Score, View Profile, Shortlist
+
+2. **View Any Candidate**
+
+   * Navigate to `/admin/candidates`
+   * Click on candidate → open `/admin/candidates/:candidateId`
+   * Click **“Find Matching Jobs”**
+   * Show **Top 10 compatible jobs** with:
+
+     * Job Title, Match Score, View Job Details
+
+3. **Shortlist Matches**
+
+   * From job detail → mark candidates as shortlisted
+   * From candidate detail → mark job as recommended
+
+---
+
+### 📁 FIREBASE STRUCTURE (UPDATED)
+
+Collections:
+
+* `/candidates`
+* `/employers`
+* `/job_posts`
+* `/applications`
+* `/shortlists`
+* `/admins`
+* `/approvals`
+
+Store computed `matchScore` in Firestore for reuse if needed.
+
+---
+
+### 💻 FILE STRUCTURE (FOR REPLIT)
+
+```
+/ (root)
+├── frontend/
+│   ├── src/pages/
+│   │   ├── EmployerDashboard.jsx
+│   │   ├── CandidateDashboard.jsx
+│   │   ├── AdminDashboard.jsx
+│   │   ├── JobDetail.jsx
+│   │   ├── CandidateDetail.jsx
+│   │   └── MatchingResults.jsx
+├── backend/
+│   ├── server.js
+│   ├── routes/
+│   │   ├── auth.js
+│   │   ├── employer.js
+│   │   ├── candidate.js
+│   │   ├── admin.js
+│   ├── utils/
+│   │   └── matchEngine.js   <-- 🔥 Matching Logic
+│   └── firebase-admin.js
+├── chatbot/
+│   └── faqBot.js
+├── exports/
+│   ├── excelExport.js
+│   └── pdfExport.js
+├── .replit
+├── replit.nix
+├── package.json
+└── README.md
+```
+
+---
+
+### 📦 EXPECTED DELIVERABLES
+
+* ✅ React UI with dashboards for each role
+* ✅ Firebase Auth integration (OTP + Email)
+* ✅ Route guards based on Firebase roles
+* ✅ Firebase Firestore/Storage integration
+* ✅ Admin panel with:
+
+  * Open jobs & candidates view
+  * Job → “Find Candidates” with compatibility scores
+  * Candidate → “Find Jobs” with compatibility scores
+* ✅ Matching logic (rule-based or similarity scoring)
+* ✅ Document upload
+* ✅ Excel/PDF export
+* ✅ Embedded chatbot with onboarding FAQ
+
+---
+
+### 📌 EXECUTE THIS PROMPT IN REPLIT AI:
+
+> Build a full-stack onboarding platform using:
+>
+> * **React (frontend)**
+> * **Express (backend)**
+> * **Firebase Auth, Firestore, and Storage**
+>   Include:
+> * Candidate/Employer registration
+> * Admin dashboard
+> * File uploads
+> * Route guards
+> * Excel/PDF export
+> * Chatbot
+> * 🔥 Matching Engine that allows admin to:
+>
+>   * View job → match top candidates
+>   * View candidate → match top jobs
+>   * Show compatibility scores
+
+---
+
+Let me know if you want me to now:
+
+* Generate the matching logic code
+* Scaffold the full Replit project
+* Output a downloadable zip
+
+Ready to proceed.

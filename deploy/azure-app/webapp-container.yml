@@ -1,0 +1,41 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  AZURE_CONTAINER_REGISTRY: '<ACR_LOGIN_SERVER>'
+  IMAGE_NAME: 'lokaltalent'
+  AZURE_RESOURCE_GROUP: '<RESOURCE_GROUP>'
+
+steps:
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'
+- script: npm ci
+- script: npm run build
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: '<SERVICE_CONNECTION>'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      ACR_NAME=$(echo $(AZURE_CONTAINER_REGISTRY) | cut -d'.' -f1)
+      az acr show --name $ACR_NAME --resource-group $(AZURE_RESOURCE_GROUP) || \
+      az acr create --name $ACR_NAME --resource-group $(AZURE_RESOURCE_GROUP) --sku Basic
+- task: Docker@2
+  inputs:
+    command: buildAndPush
+    repository: $(IMAGE_NAME)
+    containerRegistry: $(AZURE_CONTAINER_REGISTRY)
+    dockerfile: Dockerfile
+    tags: |
+      $(Build.BuildId)
+- task: AzureWebAppContainer@1
+  inputs:
+    azureSubscription: '<SERVICE_CONNECTION>'
+    appName: '<WEB_APP_NAME>'
+    containers: $(AZURE_CONTAINER_REGISTRY)/$(IMAGE_NAME):$(Build.BuildId)
+#  Custom domain binding can be automated with
+#  az webapp config hostname and ssl commands or via Terraform.

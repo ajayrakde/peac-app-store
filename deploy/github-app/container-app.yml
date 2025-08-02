@@ -1,0 +1,40 @@
+name: Deploy Container App
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Ensure ACR
+        run: |
+          ACR_NAME=$(echo "${{ secrets.ACR_LOGIN_SERVER }}" | cut -d'.' -f1)
+          az acr show --name $ACR_NAME --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} || \
+          az acr create --name $ACR_NAME --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --sku Basic
+      - run: npm ci
+      - run: npm run build
+      - uses: azure/docker-login@v2
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - run: docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/lokaltalent:${{ github.sha }} .
+      - run: docker push ${{ secrets.ACR_LOGIN_SERVER }}/lokaltalent:${{ github.sha }}
+      - uses: azure/container-apps-deploy-action@v1
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          name: ${{ secrets.CONTAINER_APP_NAME }}
+          image: ${{ secrets.ACR_LOGIN_SERVER }}/lokaltalent:${{ github.sha }}
+          registry-url: ${{ secrets.ACR_LOGIN_SERVER }}
+          registry-username: ${{ secrets.ACR_USERNAME }}
+          registry-password: ${{ secrets.ACR_PASSWORD }}
+      # Custom domain binding can also be performed via Terraform or
+      # Azure CLI: az containerapp hostname bind

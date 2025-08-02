@@ -1,0 +1,126 @@
+name: Secure Azure Container App Deployment
+
+on:
+  push:
+    branches: [main]
+
+env:
+  RESOURCE_GROUP: rg-sbx-ltin
+  CONTAINER_APP_NAME: sbxlokaltalentin
+  CONTAINER_REGISTRY: acrltin.azurecr.io
+  IMAGE_NAME: acrltin.azurecr.io/your-app:${{ github.sha }}
+  KEY_VAULT: kv-lokaltalentin
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # ----------------- 1. Azure CLI Login (SP is KeyVault secret officer) -----------------
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    # ----------------- 2. Docker login to ACR using username/password -----------------
+    - name: Docker login to ACR
+      run: echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ env.CONTAINER_REGISTRY }} -u ${{ secrets.ACR_USERNAME }} --password-stdin
+
+    # ----------------- 3. Push all secrets to Azure Key Vault (in-memory, lowercase-dashed) -----------------
+    - name: Push all secrets to Azure Key Vault (in-memory)
+      env:
+        ALL_SECRETS: ${{ toJson(secrets) }}
+        KEY_VAULT: ${{ env.KEY_VAULT }}
+      run: |
+        for key in $(echo $ALL_SECRETS | jq -r 'to_entries[] | select(.key != "AZURE_CREDENTIALS" and .key != "ACR_USERNAME" and .key != "ACR_PASSWORD" and .key != "FIREBASE_PRIVATE_KEY_B64") | .key'); do
+          kv_key=$(echo "$key" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+          val=$(echo $ALL_SECRETS | jq -r --arg k "$key" '.[$k]')
+          az keyvault secret set --vault-name $KEY_VAULT --name $kv_key --value "$val"
+        done
+    # ----------------- 4. Add all Key Vault secrets as Container App secret references (one by one) -----------------
+    - name: Add Key Vault secret references to Container App (one by one)
+      env:
+        ALL_SECRETS: ${{ toJson(secrets) }}
+        KEY_VAULT: ${{ env.KEY_VAULT }}
+        CONTAINER_APP_NAME: ${{ env.CONTAINER_APP_NAME }}
+        RESOURCE_GROUP: ${{ env.RESOURCE_GROUP }}
+      run: |
+        for key in $(echo $ALL_SECRETS | jq -r 'to_entries[] | select(.key != "AZURE_CREDENTIALS" and .key != "ACR_USERNAME" and .key != "ACR_PASSWORD" and .key != "FIREBASE_PRIVATE_KEY_B64") | .key'); do
+          kv_key=$(echo "$key" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+          ref_name="${kv_key}-ref"
+          az containerapp secret set \
+            --name "$CONTAINER_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --secrets "$ref_name=@Microsoft.KeyVault(VaultName=$KEY_VAULT;SecretName=$kv_key)"
+        done
+# ----------------- 5. Map all secret refs to env vars in Container App (batch, safe) -----------------
+    - name: Map all secret refs to env vars in Container App (in-memory)
+      env:
+        ALL_SECRETS: ${{ toJson(secrets) }}
+        CONTAINER_APP_NAME: ${{ env.CONTAINER_APP_NAME }}
+        RESOURCE_GROUP: ${{ env.RESOURCE_GROUP }}
+        KEY_VAULT: ${{ env.KEY_VAULT }}
+      run: |
+        env_args=""
+        for key in $(echo $ALL_SECRETS | jq -r 'to_entries[] | select(.key != "AZURE_CREDENTIALS" and .key != "ACR_USERNAME" and .key != "ACR_PASSWORD" and .key != "FIREBASE_PRIVATE_KEY_B64") | .key'); do
+          kv_key=$(echo "$key" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+          ref_name="${kv_key}-ref"
+          env_args="$env_args $key=secretref:$ref_name"
+        done
+        env_args="$env_args KEY_VAULT_NAME=$KEY_VAULT"
+        az containerapp update --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" --set-env-vars $env_args
+    # ----------------- 6. Build Docker image with ONLY SPECIFIED BUILD ARGS -----------------
+    - name: Build Docker image with selected build args only (in-memory)
+      env:
+        IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+        VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+        VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+        VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      run: |
+        docker build \
+          --build-arg VITE_FIREBASE_API_KEY="$VITE_FIREBASE_API_KEY" \
+          --build-arg VITE_FIREBASE_AUTH_DOMAIN="$VITE_FIREBASE_AUTH_DOMAIN" \
+          --build-arg VITE_FIREBASE_PROJECT_ID="$VITE_FIREBASE_PROJECT_ID" \
+          --build-arg VITE_FIREBASE_STORAGE_BUCKET="$VITE_FIREBASE_STORAGE_BUCKET" \
+          --build-arg VITE_FIREBASE_MESSAGING_SENDER_ID="$VITE_FIREBASE_MESSAGING_SENDER_ID" \
+          --build-arg VITE_FIREBASE_APP_ID="$VITE_FIREBASE_APP_ID" \
+          -t $IMAGE_NAME .
+    # ----------------- 7. Push Docker image to ACR -----------------
+    - name: Push Docker image to ACR
+      env:
+        IMAGE_NAME: ${{ env.IMAGE_NAME }}
+      run: |
+        docker push $IMAGE_NAME
+    # ----------------- 8. Update Container App with new image -----------------
+    - name: Update Container App with new image
+      env:
+        CONTAINER_APP_NAME: ${{ env.CONTAINER_APP_NAME }}
+        RESOURCE_GROUP: ${{ env.RESOURCE_GROUP }}
+        IMAGE_NAME: ${{ env.IMAGE_NAME }}
+      run: |
+        az containerapp update \
+          --name $CONTAINER_APP_NAME \
+          --resource-group $RESOURCE_GROUP \
+          --image $IMAGE_NAME
+    # ----------------- 9. Restart Container App to refresh secrets -----------------
+    - name: Restart Container App
+      env:
+        CONTAINER_APP_NAME: ${{ env.CONTAINER_APP_NAME }}
+        RESOURCE_GROUP: ${{ env.RESOURCE_GROUP }}
+      run: |
+        revision=$(az containerapp revision list \
+          --name "$CONTAINER_APP_NAME" \
+          --resource-group "$RESOURCE_GROUP" \
+          --query "[?properties.active].name" -o tsv | head -n 1)
+    
+        echo "Restarting revision: $revision"
+        az containerapp revision restart \
+          --name "$CONTAINER_APP_NAME" \
+          --resource-group "$RESOURCE_GROUP" \
+          --revision "$revision"

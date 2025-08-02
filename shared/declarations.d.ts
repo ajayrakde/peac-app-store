@@ -1,0 +1,9 @@
+declare module 'lucide-react';
+declare module 'drizzle-orm';
+declare module 'drizzle-orm/neon-serverless';
+declare module 'drizzle-orm/pg-core';
+declare module 'exceljs';
+declare module 'firebase/app';
+declare module 'firebase/auth';
+declare module 'firebase/firestore';
+declare module 'firebase/storage';

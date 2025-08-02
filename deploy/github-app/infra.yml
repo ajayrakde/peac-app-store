@@ -1,0 +1,20 @@
+name: Deploy Infrastructure
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.5.7'
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Terraform Apply
+        run: |
+          cd deploy/terraform
+          terraform init
+          terraform apply -auto-approve
