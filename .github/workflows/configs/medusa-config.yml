@@ -1,0 +1,24 @@
+containers:
+  - name: medusa
+    image: medusa:latest        # Placeholder, overridden by workflow
+    cpu: 1
+    memory: 2Gi
+environmentVariables:
+  - name: MEDUSA_WORKER_MODE
+    value: "default"            # Will be overridden by workflow
+  - name: DISABLE_MEDUSA_ADMIN
+    value: "false"              # Will be overridden by workflow
+  - name: DATABASE_URL
+    secretRef: PG-CONN-STRING
+  - name: REDIS_URL
+    secretRef: REDIS-CONN-STRING
+  - name: COOKIE_SECRET
+    secretRef: COOKIE-SECRET
+  - name: JWT_SECRET
+    secretRef: JWT-SECRET
+  - name: STORE_CORS
+    value: "http://localhost:3000"
+  - name: ADMIN_CORS
+    value: "http://localhost:7000"
+  - name: AUTH_CORS
+    value: "http://localhost:3000,http://localhost:7000"
