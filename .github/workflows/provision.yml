@@ -30,17 +30,45 @@ jobs:
           echo "ACR_NAME=acr-kanhaa-app-store" >> $GITHUB_ENV
           echo "KV_NAME=kv-kanhaa-app-store" >> $GITHUB_ENV
 
-      - name: Create PostgreSQL
+      - name: Create Key Vault (if not exists)
+        run: |
+          az keyvault create --name $KV_NAME --resource-group $RG --location $LOCATION || echo "Key Vault already exists."
+
+      - name: Grant Key Vault Access to SP
+        run: |
+          SP_CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientId)
+          az keyvault set-policy --name $KV_NAME --spn $SP_CLIENT_ID --secret-permissions get list set
+
+      - name: Generate and Store DB Password in Key Vault (if not exists)
+        run: |
+          if ! az keyvault secret show --vault-name $KV_NAME --name "PG-ADMIN-PASSWORD" &> /dev/null; then
+            PASSWORD=$(openssl rand -base64 24)
+            az keyvault secret set --vault-name $KV_NAME --name "PG-ADMIN-PASSWORD" --value "$PASSWORD"
+          fi
+
+      - name: Get DB Password from Key Vault
+        id: get_db_password
+        run: |
+          echo "PG_PASSWORD=$(az keyvault secret show --vault-name $KV_NAME --name PG-ADMIN-PASSWORD --query value -o tsv)" >> $GITHUB_ENV
+
+      - name: Create PostgreSQL DB
         run: |
           az postgres flexible-server create \
             --resource-group $RG \
             --name $PG_NAME \
             --admin-user medusauser \
-            --admin-password YourStrongPassword123! \
+            --admin-password $PG_PASSWORD \
             --location $LOCATION \
             --public-access 0.0.0.0
 
-      - name: Create Redis
+      - name: Store PG Connection String in Key Vault
+        run: |
+          PG_CONN_STR="postgres://medusauser:$PG_PASSWORD@$PG_NAME.postgres.database.azure.com:5432/medusadb"
+          az keyvault secret set --vault-name $KV_NAME --name "PG-CONN-STRING" --value "$PG_CONN_STR"
+
+      # Repeat the pattern for Redis and Storage: generate password/key, store in Key Vault, create resource, save output
+
+      - name: Create Redis (demo: no password for Basic, but store conn string anyway)
         run: |
           az redis create \
             --name $REDIS_NAME \
@@ -48,6 +76,9 @@ jobs:
             --location $LOCATION \
             --sku Basic \
             --vm-size C0
+          REDIS_HOST=$(az redis show --name $REDIS_NAME --resource-group $RG --query hostName -o tsv)
+          REDIS_CONN="redis://$REDIS_HOST:6379"
+          az keyvault secret set --vault-name $KV_NAME --name "REDIS-CONN-STRING" --value "$REDIS_CONN"
 
       - name: Create Blob Storage
         run: |
@@ -56,6 +87,8 @@ jobs:
             --resource-group $RG \
             --location $LOCATION \
             --sku Standard_LRS
+          STORAGE_KEY=$(az storage account keys list --account-name $STORAGE_NAME --resource-group $RG --query '[0].value' -o tsv)
+          az keyvault secret set --vault-name $KV_NAME --name "STORAGE-ACCOUNT-KEY" --value "$STORAGE_KEY"
 
       - name: Create Container Registry (ACR)
         run: |
@@ -64,15 +97,7 @@ jobs:
             --name $ACR_NAME \
             --sku Basic \
             --location $LOCATION
-
-      - name: Create Azure Key Vault
-        run: |
-          az keyvault create \
-            --name $KV_NAME \
-            --resource-group $RG \
-            --location $LOCATION
-
-      # Add secrets to Key Vault as needed, e.g.:
-      # - name: Add secrets to Key Vault
-      #   run: |
-      #     az keyvault secret set --vault-name $KV_NAME --name "PG-ADMIN-PASSWORD" --value "YourStrongPassword123!"
+          ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query username -o tsv)
+          ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query passwords[0].value -o tsv)
+          az keyvault secret set --vault-name $KV_NAME --name "ACR-USERNAME" --value "$ACR_USERNAME"
+          az keyvault secret set --vault-name $KV_NAME --name "ACR-PASSWORD" --value "$ACR_PASSWORD"
