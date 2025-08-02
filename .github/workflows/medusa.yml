@@ -1,0 +1,133 @@
+name: 🧹 Deploy Medusa to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Medusa Deployment
+
+    env:
+      SUBSCRIPTION_ID: ${{ vars.AZ_SUBSCRIPTION_ID }}
+      RESOURCE_GROUP: ${{ vars.RG_NAME }}
+      ACR_NAME: ${{ vars.ACR_NAME }}
+      ENVIRONMENT_NAME: ${{ vars.ENVIRONMENT }}
+      IMAGE_TAG: medusa:${{ github.sha }}
+      REGISTRY_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
+      IMAGE_URI: ${{ vars.ACR_NAME }}.azurecr.io/medusa:${{ github.sha }}
+
+      STORE_CORS: "http://localhost:3000"
+      ADMIN_CORS: "http://localhost:7000"
+      AUTH_CORS: "http://localhost:3000,http://localhost:7000"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Generate and store JWT_SECRET and COOKIE_SECRET in Key Vault if missing
+        shell: bash
+        env:
+          RESOURCE_GROUP: ${{ env.RESOURCE_GROUP }}
+          SUBSCRIPTION_ID: ${{ env.SUBSCRIPTION_ID }}
+          KEY_VAULT_NAME: kv-kanhaa-app-store  # Adjust if KV name is different
+        run: |
+          # Check and create JWT_SECRET if missing
+          if ! az keyvault secret show --vault-name $KEY_VAULT_NAME --name JWT-SECRET &> /dev/null; then
+            JWT_SECRET=$(openssl rand -hex 32)
+            az keyvault secret set --vault-name $KEY_VAULT_NAME --name JWT-SECRET --value "$JWT_SECRET"
+            echo "Created JWT-SECRET in Key Vault"
+          else
+            echo "JWT-SECRET already exists in Key Vault"
+          fi
+
+          # Check and create COOKIE_SECRET if missing
+          if ! az keyvault secret show --vault-name $KEY_VAULT_NAME --name COOKIE-SECRET &> /dev/null; then
+            COOKIE_SECRET=$(openssl rand -hex 32)
+            az keyvault secret set --vault-name $KEY_VAULT_NAME --name COOKIE-SECRET --value "$COOKIE_SECRET"
+            echo "Created COOKIE-SECRET in Key Vault"
+          else
+            echo "COOKIE-SECRET already exists in Key Vault"
+          fi
+
+      - name: Deploy medusa-server
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          appSourcePath: .
+          acrName: ${{ env.ACR_NAME }}
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          containerAppName: medusa-server
+          containerAppEnvironment: ${{ env.ENVIRONMENT_NAME }}
+          registryServer: ${{ env.REGISTRY_SERVER }}
+          imageToDeploy: ${{ env.IMAGE_URI }}
+        yamlConfig: |
+          containers:
+            - name: medusa
+              image: ${{ env.IMAGE_URI }}
+              cpu: 1
+              memory: 2Gi
+          environmentVariables:
+            - name: MEDUSA_WORKER_MODE
+              value: "server"
+            - name: DISABLE_MEDUSA_ADMIN
+              value: "false"
+            - name: DATABASE_URL
+              secretRef: PG-CONN-STRING
+            - name: REDIS_URL
+              secretRef: REDIS-CONN-STRING
+            - name: COOKIE_SECRET
+              secretRef: COOKIE-SECRET
+            - name: JWT_SECRET
+              secretRef: JWT-SECRET
+            - name: STORE_CORS
+              value: ${{ env.STORE_CORS }}
+            - name: ADMIN_CORS
+              value: ${{ env.ADMIN_CORS }}
+            - name: AUTH_CORS
+              value: ${{ env.AUTH_CORS }}
+
+      - name: Deploy medusa-worker
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          acrName: ${{ env.ACR_NAME }}
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          containerAppName: medusa-worker
+          containerAppEnvironment: ${{ env.ENVIRONMENT_NAME }}
+          registryServer: ${{ env.REGISTRY_SERVER }}
+          imageToDeploy: ${{ env.IMAGE_URI }}
+        yamlConfig: |
+          containers:
+            - name: medusa
+              image: ${{ env.IMAGE_URI }}
+              cpu: 1
+              memory: 2Gi
+          environmentVariables:
+            - name: MEDUSA_WORKER_MODE
+              value: "worker"
+            - name: DISABLE_MEDUSA_ADMIN
+              value: "true"
+            - name: DATABASE_URL
+              secretRef: PG-CONN-STRING
+            - name: REDIS_URL
+              secretRef: REDIS-CONN-STRING
+            - name: COOKIE_SECRET
+              secretRef: COOKIE-SECRET
+            - name: JWT_SECRET
+              secretRef: JWT-SECRET
+            - name: STORE_CORS
+              value: ${{ env.STORE_CORS }}
+            - name: ADMIN_CORS
+              value: ${{ env.ADMIN_CORS }}
+            - name: AUTH_CORS
+              value: ${{ env.AUTH_CORS }}
