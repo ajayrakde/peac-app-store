@@ -9,10 +9,10 @@ jobs:
 
     env:
       ACR_NAME: "acrkanhaaappstore"
-      REGISTRY_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
+      REGISTRY_SERVER: ${{ env.ACR_NAME }}.azurecr.io
       IMAGE_NAME: medusa
       IMAGE_TAG: ${{ github.sha }}
-      IMAGE_URI: ${{ secrets.ACR_NAME }}.azurecr.io/medusa:${{ github.sha }}
+      IMAGE_URI: ${{ env.ACR_NAME }}.azurecr.io/medusa:${{ github.sha }}
       KEY_VAULT_NAME: kv-kanhaa-app-store
 
     steps:
