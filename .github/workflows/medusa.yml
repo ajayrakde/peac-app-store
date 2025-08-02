@@ -64,6 +64,15 @@ jobs:
             - name: DISABLE_MEDUSA_ADMIN
               value: "false"
 
+      - name: Assign system-assigned managed identity to medusa-server
+        run: |
+          az containerapp identity assign --name medusa-server --resource-group ${{ env.RESOURCE_GROUP }}
+
+      - name: Grant Key Vault Secrets User role to medusa-server managed identity
+        run: |
+          PRINCIPAL_ID=$(az containerapp show --name medusa-server --resource-group ${{ env.RESOURCE_GROUP }} --query identity.principalId -o tsv)
+          az role assignment create --assignee $PRINCIPAL_ID --role "Key Vault Administrator" --scope "/subscriptions/6a324482-7a11-4ff0-8540-48ccd816e396/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.KeyVault/vaults/kv-kanhaa-app-store" || echo "Role assignment exists or error ignored"
+
       - name: Deploy medusa-worker
         uses: azure/container-apps-deploy-action@v1
         with:
@@ -79,3 +88,12 @@ jobs:
               value: "worker"
             - name: DISABLE_MEDUSA_ADMIN
               value: "true"
+
+      - name: Assign system-assigned managed identity to medusa-worker
+        run: |
+          az containerapp identity assign --name medusa-worker --resource-group ${{ env.RESOURCE_GROUP }}
+
+      - name: Grant Key Vault Secrets User role to medusa-worker managed identity
+        run: |
+          PRINCIPAL_ID=$(az containerapp show --name medusa-worker --resource-group ${{ env.RESOURCE_GROUP }} --query identity.principalId -o tsv)
+          az role assignment create --assignee $PRINCIPAL_ID --role "Key Vault Administrator" --scope "/subscriptions/6a324482-7a11-4ff0-8540-48ccd816e396/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.KeyVault/vaults/kv-kanhaa-app-store" || echo "Role assignment exists or error ignored"
