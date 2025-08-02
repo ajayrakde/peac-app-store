@@ -11,6 +11,15 @@ jobs:
   provision:
     runs-on: ubuntu-latest
     name: Azure Provisioning
+    env:
+      RG: rg-kanhaa-app-store
+      LOCATION: centralindia
+      PG_NAME: pg-kanhaa-app-store
+      REDIS_NAME: redis-kanhaa-app-store
+      STORAGE_NAME: stkanhaaappstore
+      ACR_NAME: acr-kanhaa-app-store
+      KV_NAME: kv-kanhaa-app-store
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -19,16 +28,6 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Set variables
-        run: |
-          echo "RG=rg-kanhaa-app-store" >> $GITHUB_ENV
-          echo "LOCATION=centralindia" >> $GITHUB_ENV
-          echo "PG_NAME=pg-kanhaa-app-store" >> $GITHUB_ENV
-          echo "REDIS_NAME=redis-kanhaa-app-store" >> $GITHUB_ENV
-          echo "STORAGE_NAME=stkanhaaappstore" >> $GITHUB_ENV
-          echo "ACR_NAME=acr-kanhaa-app-store" >> $GITHUB_ENV
-          echo "KV_NAME=kv-kanhaa-app-store" >> $GITHUB_ENV
 
       - name: Create Key Vault (if not exists)
         run: |
@@ -48,8 +47,7 @@ jobs:
 
       - name: Get DB Password from Key Vault
         id: get_db_password
-        run: |
-          echo "PG_PASSWORD=$(az keyvault secret show --vault-name $KV_NAME --name PG-ADMIN-PASSWORD --query value -o tsv)" >> $GITHUB_ENV
+        run: echo "PG_PASSWORD=$(az keyvault secret show --vault-name $KV_NAME --name PG-ADMIN-PASSWORD --query value -o tsv)" >> $GITHUB_ENV
 
       - name: Create PostgreSQL DB
         run: |
@@ -63,12 +61,10 @@ jobs:
 
       - name: Store PG Connection String in Key Vault
         run: |
-          PG_CONN_STR="postgres://medusauser:$PG_PASSWORD@$PG_NAME.postgres.database.azure.com:5432/medusadb"
+          PG_CONN_STR="postgres://medusauser:$PG_PASSWORD@${{ env.PG_NAME }}.postgres.database.azure.com:5432/medusadb"
           az keyvault secret set --vault-name $KV_NAME --name "PG-CONN-STRING" --value "$PG_CONN_STR"
 
-      # Repeat the pattern for Redis and Storage: generate password/key, store in Key Vault, create resource, save output
-
-      - name: Create Redis (demo: no password for Basic, but store conn string anyway)
+      - name: Create Redis
         run: |
           az redis create \
             --name $REDIS_NAME \
