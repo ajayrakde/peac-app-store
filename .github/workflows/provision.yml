@@ -38,12 +38,10 @@ jobs:
         run: |
           SP_CLIENT_ID=$(echo "${{ secrets.AZURE_CREDENTIALS }}" | jq -r .clientId)
           echo "SP_CLIENT_ID is: $SP_CLIENT_ID"
-          for ROLE in "Key Vault Secrets Officer" "Key Vault Certificates Officer" "Key Vault Crypto Officer"; do
-            az role assignment create \
-              --assignee $SP_CLIENT_ID \
-              --role "$ROLE" \
-              --scope "/subscriptions/6a324482-7a11-4ff0-8540-48ccd816e396/resourceGroups/$RG/providers/Microsoft.KeyVault/vaults/$KV_NAME"
-          done
+          az role assignment create \
+            --assignee $SP_CLIENT_ID \
+            --role ""Key Vault Administrator"" \
+            --scope "/subscriptions/6a324482-7a11-4ff0-8540-48ccd816e396/resourceGroups/$RG/providers/Microsoft.KeyVault/vaults/$KV_NAME"
 
       - name: Generate and Store DB Password in Key Vault
         run: |
