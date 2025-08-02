@@ -1,0 +1,78 @@
+name: Provision Azure Infra
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    name: Azure Provisioning
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set variables
+        run: |
+          echo "RG=rg-kanhaa-app-store" >> $GITHUB_ENV
+          echo "LOCATION=centralindia" >> $GITHUB_ENV
+          echo "PG_NAME=pg-kanhaa-app-store" >> $GITHUB_ENV
+          echo "REDIS_NAME=redis-kanhaa-app-store" >> $GITHUB_ENV
+          echo "STORAGE_NAME=stkanhaaappstore" >> $GITHUB_ENV
+          echo "ACR_NAME=acr-kanhaa-app-store" >> $GITHUB_ENV
+          echo "KV_NAME=kv-kanhaa-app-store" >> $GITHUB_ENV
+
+      - name: Create PostgreSQL
+        run: |
+          az postgres flexible-server create \
+            --resource-group $RG \
+            --name $PG_NAME \
+            --admin-user medusauser \
+            --admin-password YourStrongPassword123! \
+            --location $LOCATION \
+            --public-access 0.0.0.0
+
+      - name: Create Redis
+        run: |
+          az redis create \
+            --name $REDIS_NAME \
+            --resource-group $RG \
+            --location $LOCATION \
+            --sku Basic \
+            --vm-size C0
+
+      - name: Create Blob Storage
+        run: |
+          az storage account create \
+            --name $STORAGE_NAME \
+            --resource-group $RG \
+            --location $LOCATION \
+            --sku Standard_LRS
+
+      - name: Create Container Registry (ACR)
+        run: |
+          az acr create \
+            --resource-group $RG \
+            --name $ACR_NAME \
+            --sku Basic \
+            --location $LOCATION
+
+      - name: Create Azure Key Vault
+        run: |
+          az keyvault create \
+            --name $KV_NAME \
+            --resource-group $RG \
+            --location $LOCATION
+
+      # Add secrets to Key Vault as needed, e.g.:
+      # - name: Add secrets to Key Vault
+      #   run: |
+      #     az keyvault secret set --vault-name $KV_NAME --name "PG-ADMIN-PASSWORD" --value "YourStrongPassword123!"
