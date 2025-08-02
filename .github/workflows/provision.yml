@@ -29,18 +29,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Create Key Vault (if not exists)
-        run: |
-          az keyvault create --name $KV_NAME --resource-group $RG --location $LOCATION --enable-rbac-authorization true || echo "Key Vault already exists."
-
-      - name: Grant Key Vault Access to SP via RBAC
-        run: |
-          SP_CLIENT_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r .clientId)
-          az role assignment create \
-            --assignee $SP_CLIENT_ID \
-            --role "Key Vault Secrets User" \
-            --scope "/subscriptions/6a324482-7a11-4ff0-8540-48ccd816e396/resourceGroups/$RG/providers/Microsoft.KeyVault/vaults/$KV_NAME"
-
       - name: Generate and Store DB Password in Key Vault (if not exists)
         run: |
           if ! az keyvault secret show --vault-name $KV_NAME --name "PG-ADMIN-PASSWORD" &> /dev/null; then
