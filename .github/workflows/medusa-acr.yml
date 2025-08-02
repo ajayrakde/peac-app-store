@@ -8,7 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      REGISTRY_SERVER: ${{ secrets.ACR_NAME }}.azurecr.io
+      ACR_NAME: "acrkanhaaappstore"
+      REGISTRY_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
       IMAGE_NAME: medusa
       IMAGE_TAG: ${{ github.sha }}
       IMAGE_URI: ${{ secrets.ACR_NAME }}.azurecr.io/medusa:${{ github.sha }}
