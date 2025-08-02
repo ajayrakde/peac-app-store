@@ -13,12 +13,11 @@ jobs:
     name: Medusa Deployment
 
     env:
-      SUBSCRIPTION_ID: ${{ vars.AZ_SUBSCRIPTION_ID }}
       RESOURCE_GROUP: ${{ vars.RG_NAME }}
       ACR_NAME: ${{ vars.ACR_NAME }}
-      ENVIRONMENT_NAME: ${{ vars.ENVIRONMENT }}
-      IMAGE_TAG: medusa:${{ github.sha }}
+      ENVIRONMENT_NAME: ${{ vars.ENV_NAME }}
       REGISTRY_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
+      IMAGE_TAG: medusa:${{ github.sha }}
       IMAGE_URI: ${{ vars.ACR_NAME }}.azurecr.io/medusa:${{ github.sha }}
 
       STORE_CORS: "http://localhost:3000"
@@ -38,8 +37,45 @@ jobs:
         shell: bash
         env:
           RESOURCE_GROUP: ${{ env.RESOURCE_GROUP }}
-          SUBSCRIPTION_ID: ${{ env.SUBSCRIPTION_ID }}
-          KEY_VAULT_NAME: kv-kanhaa-app-store  # Adjust if KV name is different
+          KEY_VAULT_NAME: kv-kanhaa-app-store  # Adjust as needed
         run: |
-          # Check and create JWT_SECRET if missing
-          if ! az keyvault secret show --v
+          if ! az keyvault secret show --vault-name $KEY_VAULT_NAME --name JWT-SECRET &> /dev/null; then
+            JWT_SECRET=$(openssl rand -hex 32)
+            az keyvault secret set --vault-name $KEY_VAULT_NAME --name JWT-SECRET --value "$JWT_SECRET"
+          fi
+          if ! az keyvault secret show --vault-name $KEY_VAULT_NAME --name COOKIE-SECRET &> /dev/null; then
+            COOKIE_SECRET=$(openssl rand -hex 32)
+            az keyvault secret set --vault-name $KEY_VAULT_NAME --name COOKIE-SECRET --value "$COOKIE_SECRET"
+          fi
+
+      - name: Deploy medusa-server
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          acrName: ${{ env.ACR_NAME }}
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          containerAppName: medusa-server
+          containerAppEnvironment: ${{ env.ENVIRONMENT_NAME }}
+          registryUrl: ${{ env.REGISTRY_SERVER }}
+          imageToDeploy: ${{ env.IMAGE_URI }}
+          yamlConfigPath: ./configs/medusa-config.yaml
+          environmentVariables: |
+            - name: MEDUSA_WORKER_MODE
+              value: "server"
+            - name: DISABLE_MEDUSA_ADMIN
+              value: "false"
+
+      - name: Deploy medusa-worker
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          acrName: ${{ env.ACR_NAME }}
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          containerAppName: medusa-worker
+          containerAppEnvironment: ${{ env.ENVIRONMENT_NAME }}
+          registryUrl: ${{ env.REGISTRY_SERVER }}
+          imageToDeploy: ${{ env.IMAGE_URI }}
+          yamlConfigPath: ./configs/medusa-config.yaml
+          environmentVariables: |
+            - name: MEDUSA_WORKER_MODE
+              value: "worker"
+            - name: DISABLE_MEDUSA_ADMIN
+              value: "true"
