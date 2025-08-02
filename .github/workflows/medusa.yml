@@ -11,15 +11,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     name: Medusa Deployment
-
+    environment: SBX
     env:
-      RESOURCE_GROUP: ${{ vars.RG_NAME }}
-      ACR_NAME: ${{ vars.ACR_NAME }}
-      ENVIRONMENT_NAME: ${{ vars.ENV_NAME }}
+      RESOURCE_GROUP: "rg-kanhaa-app-store"
+      ACR_NAME: "acrkanhaaappstore"
+      ENVIRONMENT_NAME: "SBX"
       REGISTRY_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
       IMAGE_TAG: medusa:${{ github.sha }}
       IMAGE_URI: ${{ vars.ACR_NAME }}.azurecr.io/medusa:${{ github.sha }}
-
+      KEY_VAULT_NAME: "kv-kanhaa-app-store"
       STORE_CORS: "http://localhost:3000"
       ADMIN_CORS: "http://localhost:7000"
       AUTH_CORS: "http://localhost:3000,http://localhost:7000"
