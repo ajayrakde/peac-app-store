@@ -6,7 +6,6 @@ on:
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
-
     env:
       ACR_NAME: "acrkanhaaappstore"
       REGISTRY_SERVER: ${{ env.ACR_NAME }}.azurecr.io
