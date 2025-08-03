@@ -2,21 +2,25 @@ name: Build and Push Medusa Image to ACR
 
 on:
   workflow_dispatch: {}
-  
+
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
+
     env:
-      ACR_NAME: "acrkanhaaappstore"
-      REGISTRY_SERVER: ${{ env.ACR_NAME }}.azurecr.io
+      ACR_NAME: acrkanhaaappstore
       IMAGE_NAME: medusa
-      IMAGE_TAG: ${{ github.sha }}
-      IMAGE_URI: ${{ env.ACR_NAME }}.azurecr.io/medusa:${{ github.sha }}
       KEY_VAULT_NAME: kv-kanhaa-app-store
 
     steps:
       - name: Checkout current repo (for workflows)
         uses: actions/checkout@v4
+
+      - name: Set dependent environment variables
+        run: |
+          echo "REGISTRY_SERVER=${{ env.ACR_NAME }}.azurecr.io" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+          echo "IMAGE_URI=${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Login to Azure CLI
         uses: azure/login@v2
@@ -26,8 +30,8 @@ jobs:
       - name: Get ACR credentials from Key Vault
         id: get_acr_creds
         run: |
-          ACR_USERNAME=$(az keyvault secret show --vault-name $KEY_VAULT_NAME --name "ACR-USERNAME" --query value -o tsv)
-          ACR_PASSWORD=$(az keyvault secret show --vault-name $KEY_VAULT_NAME --name "ACR-PASSWORD" --query value -o tsv)
+          ACR_USERNAME=$(az keyvault secret show --vault-name ${{ env.KEY_VAULT_NAME }} --name "ACR-USERNAME" --query value -o tsv)
+          ACR_PASSWORD=$(az keyvault secret show --vault-name ${{ env.KEY_VAULT_NAME }} --name "ACR-PASSWORD" --query value -o tsv)
           echo "ACR_USERNAME=$ACR_USERNAME" >> $GITHUB_ENV
           echo "ACR_PASSWORD=$ACR_PASSWORD" >> $GITHUB_ENV
 
